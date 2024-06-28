@@ -119,11 +119,11 @@ uint8_t user_id = 1;
 
 // Default configuration values for MQTT
 // This actually works
-#define MQTT_SERVER              "myhome.gw"
+#define MQTT_SERVER              "192.168.137.1"
 #define MQTT_SERVERPORT          "1883" //1883, or 8883 for SSL
-#define MQTT_USERNAME            "myhome"
-#define MQTT_KEY                 "myhome" //key or password
-#define MQTT_TOPIC               "hass/sensor/hcd/ESP32_xxxxx/state" // MQTT TOPIC
+#define MQTT_USERNAME            "guest"
+#define MQTT_KEY                 "guest" //key or password
+#define MQTT_TOPIC               "amq/topic" // MQTT TOPIC
 
 // Labels for custom parameters in WiFi manager
 #define MQTT_SERVER_Label             "MQTT_SERVER_Label"
@@ -158,7 +158,7 @@ String ssid = "ESP32_" + String(ESP_getChipId(), HEX);
 String password;
 
 // Just dummy topics. To be updated later when got valid data from FS or Config Portal
-String MQTT_Pub_Topic   = "hass/sensor/hcd/" + ssid +"/state";
+String MQTT_Pub_Topic   = "amq/topic";
 
 // SSID and PW for your Router
 String Router_SSID;
@@ -540,7 +540,8 @@ void data_publish()
   serializeJson(json1, Serial);
   serializeJson(json1, sensor_payload, sizeof(sensor_payload));
   //pub_sensor_values.publish(sensor_payload);
-    
+
+  Serial.print(F(pub_sensor_values));  
   MQTT_connect();
   
   if (pub_sensor_values->publish(sensor_payload)) 
@@ -693,17 +694,31 @@ void createNewInstances()
   // Create new instances from new data
   if (!mqtt)
   {
-    // Setup the MQTT client class by passing in the WiFi client and MQTT server and login details.
-    mqtt = new Adafruit_MQTT_Client(client, custom_MQTT_SERVER, atoi(custom_MQTT_SERVERPORT), custom_MQTT_USERNAME, custom_MQTT_KEY);
-    
     Serial.print(F("Creating new MQTT object : "));
+
+    // Setup the MQTT client class by passing in the WiFi client and MQTT server and login details.
+    // if (custom_MQTT_SERVER != " ") {
+    //   mqtt = new Adafruit_MQTT_Client(client, custom_MQTT_SERVER, atoi(custom_MQTT_SERVERPORT), custom_MQTT_USERNAME, custom_MQTT_KEY);
+    // }
+    // else{
+      mqtt = new Adafruit_MQTT_Client(client, MQTT_SERVER, atoi(MQTT_SERVERPORT), MQTT_USERNAME, MQTT_KEY);
+    // }
+    
     
     if (mqtt)
     {
       Serial.println(F("OK"));
-      Serial.println(String("MQTT_SERVER = ")    + custom_MQTT_SERVER    + ", MQTT_SERVERPORT = "  + custom_MQTT_SERVERPORT);
-      Serial.println(String("MQTT_USERNAME = ")  + custom_MQTT_USERNAME  + ", MQTT_KEY = "         + custom_MQTT_KEY);
+      // if (custom_MQTT_SERVER != " ") {
+      // Serial.println(String("MQTT_SERVER = ")    + custom_MQTT_SERVER    + ", MQTT_SERVERPORT = "  + custom_MQTT_SERVERPORT);
+      // Serial.println(String("MQTT_USERNAME = ")  + custom_MQTT_USERNAME  + ", MQTT_KEY = "         + custom_MQTT_KEY);
+      // Serial.println(String("MQTT_Pub_Topic = ")  + MQTT_Pub_Topic);
+      // }
+      // else{
+      Serial.println(String("MQTT_SERVER = ")    + MQTT_SERVER    + ", MQTT_SERVERPORT = "  + MQTT_SERVERPORT);
+      Serial.println(String("MQTT_USERNAME = ")  + MQTT_USERNAME  + ", MQTT_KEY = "         + MQTT_KEY);
       Serial.println(String("MQTT_Pub_Topic = ")  + MQTT_Pub_Topic);
+
+      // }
     }
     else
       Serial.println(F("Failed"));
@@ -907,9 +922,9 @@ void wifi_manager()
 
   deleteOldInstances();
 
-  MQTT_Pub_Topic = String(custom_MQTT_TOPIC);
+  // MQTT_Pub_Topic = String(custom_MQTT_TOPIC);
   //createNewInstances();
-  WiFi.mode(WIFI_OFF);
+  // WiFi.mode(WIFI_OFF);
   currentTime = millis(); // Reset start time for sleep mode
 }
 
@@ -1074,7 +1089,7 @@ void MQTT_connect()
 {
   int8_t ret;
 
-  MQTT_Pub_Topic = String(custom_MQTT_TOPIC);
+  // MQTT_Pub_Topic = String(custom_MQTT_TOPIC);
 
   createNewInstances();
 
@@ -1179,9 +1194,9 @@ void setup()
   Serial.print(F(" on ")); Serial.println(ARDUINO_BOARD);
   Serial.println(ESP_WIFIMANAGER_VERSION);
 
-  btn.attachClick(handleClick);
-  btn.attachDoubleClick(handleDoubleClick);
-  btn.attachLongPressStop(handleLongPressStop);
+  btn.attachClick(handleLongPressStop);
+  // btn.attachDoubleClick(handleDoubleClick);
+  // btn.attachLongPressStop(handleLongPressStop);
 
   // Initialize the LED digital pin as an output.
   // pinMode(BLUE_LED, OUTPUT);
@@ -1484,8 +1499,8 @@ void preCheck(void *pvParameters)
   
   for (;;) 
   {
-    // this is just for checking go into sleep mode
-    check_interval();
+    // // this is just for checking go into sleep mode
+    // check_interval();
 
     displayNotice();
 
@@ -1787,7 +1802,7 @@ void tempMlx90614(void *pvParameters)
   vTaskDelay(pdMS_TO_TICKS(200));
 
   deleteOldInstances();
-  WiFi.mode(WIFI_OFF);
+  // WiFi.mode(WIFI_OFF);
 
   ESP.restart();
 }
