@@ -119,11 +119,11 @@ uint8_t user_id = 1;
 
 // Default configuration values for MQTT
 // This actually works
-#define MQTT_SERVER              "192.168.137.1"
+#define MQTT_SERVER              "192.168.1.7"
 #define MQTT_SERVERPORT          "1883" //1883, or 8883 for SSL
-#define MQTT_USERNAME            "guest"
-#define MQTT_KEY                 "guest" //key or password
-#define MQTT_TOPIC               "amq/topic" // MQTT TOPIC
+#define MQTT_USERNAME            "default"
+#define MQTT_KEY                 "default" //key or password
+#define MQTT_TOPIC               "hass/sensor/hcd/ESP32_xxxxx/state" // MQTT TOPIC
 
 // Labels for custom parameters in WiFi manager
 #define MQTT_SERVER_Label             "MQTT_SERVER_Label"
@@ -158,7 +158,7 @@ String ssid = "ESP32_" + String(ESP_getChipId(), HEX);
 String password;
 
 // Just dummy topics. To be updated later when got valid data from FS or Config Portal
-String MQTT_Pub_Topic   = "amq/topic";
+String MQTT_Pub_Topic   = "hass/sensor/hcd/" + ssid +"/state";
 
 // SSID and PW for your Router
 String Router_SSID;
@@ -694,31 +694,17 @@ void createNewInstances()
   // Create new instances from new data
   if (!mqtt)
   {
-    Serial.print(F("Creating new MQTT object : "));
-
     // Setup the MQTT client class by passing in the WiFi client and MQTT server and login details.
-    // if (custom_MQTT_SERVER != " ") {
-    //   mqtt = new Adafruit_MQTT_Client(client, custom_MQTT_SERVER, atoi(custom_MQTT_SERVERPORT), custom_MQTT_USERNAME, custom_MQTT_KEY);
-    // }
-    // else{
-      mqtt = new Adafruit_MQTT_Client(client, MQTT_SERVER, atoi(MQTT_SERVERPORT), MQTT_USERNAME, MQTT_KEY);
-    // }
+    mqtt = new Adafruit_MQTT_Client(client, custom_MQTT_SERVER, atoi(custom_MQTT_SERVERPORT), custom_MQTT_USERNAME, custom_MQTT_KEY);
     
+    Serial.print(F("Creating new MQTT object : "));
     
     if (mqtt)
     {
       Serial.println(F("OK"));
-      // if (custom_MQTT_SERVER != " ") {
-      // Serial.println(String("MQTT_SERVER = ")    + custom_MQTT_SERVER    + ", MQTT_SERVERPORT = "  + custom_MQTT_SERVERPORT);
-      // Serial.println(String("MQTT_USERNAME = ")  + custom_MQTT_USERNAME  + ", MQTT_KEY = "         + custom_MQTT_KEY);
-      // Serial.println(String("MQTT_Pub_Topic = ")  + MQTT_Pub_Topic);
-      // }
-      // else{
-      Serial.println(String("MQTT_SERVER = ")    + MQTT_SERVER    + ", MQTT_SERVERPORT = "  + MQTT_SERVERPORT);
-      Serial.println(String("MQTT_USERNAME = ")  + MQTT_USERNAME  + ", MQTT_KEY = "         + MQTT_KEY);
+      Serial.println(String("MQTT_SERVER = ")    + custom_MQTT_SERVER    + ", MQTT_SERVERPORT = "  + custom_MQTT_SERVERPORT);
+      Serial.println(String("MQTT_USERNAME = ")  + custom_MQTT_USERNAME  + ", MQTT_KEY = "         + custom_MQTT_KEY);
       Serial.println(String("MQTT_Pub_Topic = ")  + MQTT_Pub_Topic);
-
-      // }
     }
     else
       Serial.println(F("Failed"));
@@ -922,7 +908,7 @@ void wifi_manager()
 
   deleteOldInstances();
 
-  // MQTT_Pub_Topic = String(custom_MQTT_TOPIC);
+  MQTT_Pub_Topic = String(custom_MQTT_TOPIC);
   //createNewInstances();
   // WiFi.mode(WIFI_OFF);
   currentTime = millis(); // Reset start time for sleep mode
@@ -1089,7 +1075,7 @@ void MQTT_connect()
 {
   int8_t ret;
 
-  // MQTT_Pub_Topic = String(custom_MQTT_TOPIC);
+  MQTT_Pub_Topic = String(custom_MQTT_TOPIC);
 
   createNewInstances();
 
