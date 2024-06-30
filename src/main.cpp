@@ -1355,10 +1355,6 @@ void setup()
   display.clearDisplay();
   display.setTextColor(WHITE);
   display.setRotation(2);
-    // MAX30102
-    particleSensor.setup(ledBrightness, sampleAverage, ledMode, sampleRate, pulseWidth, adcRange); //Configure sensor with these settings
-    // MLX90614
-    mlx.begin();
 
 
   // // MAX30102
@@ -1419,6 +1415,10 @@ void loop()
     // create mutex and assign it a already create handler 
     xMutex = xSemaphoreCreateMutex();
   
+    // MAX30102
+    particleSensor.setup(ledBrightness, sampleAverage, ledMode, sampleRate, pulseWidth, adcRange); //Configure sensor with these settings
+    // MLX90614
+    mlx.begin();
 
     // ************************************************************************************************************
     // Define reference handlers to these two tasks. Use these TaskHandle_t type variables to change task priority.
@@ -1448,13 +1448,13 @@ void loop()
     TaskHandle_t TaskHandle_2; // handler for Task2
     TaskHandle_t TaskHandle_3; // handler for Task3
 
-    delay(500);
     TASK_COMPLETE_1 = false;
     TASK_COMPLETE_2 = false;
     TASK_COMPLETE_3 = false;
     TASK_COMPLETE_4 = false;
     Serial.println(F("Starting New Loop"));
     check_WiFi();    
+    delay(500);
 
     // set up 4 tasks to run independently.
     xTaskCreatePinnedToCore(
@@ -1678,7 +1678,7 @@ void hrMax30102(void *pvParameters)
   (void) pvParameters;
 
   xSemaphoreTake(xMutex, portMAX_DELAY);
-
+  chkCount = 0;
   checkFlag = false;
   //digitalWrite(BLUE_LED, 1);
   pixels->clear(); // Set all pixel colors to 'off'
@@ -1764,8 +1764,10 @@ void hrMax30102(void *pvParameters)
        
     p->base_unit1 = "bpm";
     p->base_unit2 = "bpm";
-    
+    TASK_COMPLETE_2 = true;
+
     displayFinal(p);
+    Serial.println(F("Task 2 is completed"));
     
   }else {
     TASK_COMPLETE_2 = true;
@@ -1775,8 +1777,8 @@ void hrMax30102(void *pvParameters)
     spo2 = 0;
     displayError();
   }
-  TASK_COMPLETE_2 = true;
-  
+  Serial.println(F("deleting task 2"));
+  xSemaphoreGive(xMutex); // release mutex
   vTaskDelay(pdMS_TO_TICKS(100));
   vTaskDelete(NULL);
 }
@@ -1785,14 +1787,22 @@ void hrMax30102(void *pvParameters)
 //*******************************************************************************************************
 void spo2Max30102(void *pvParameters)
 {
+
+  (void) pvParameters;
+  
+  while (TASK_COMPLETE_1 == false || TASK_COMPLETE_2 == false) {
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
+  chkCount = 0;
+  xSemaphoreTake(xMutex, portMAX_DELAY);
+
+  Serial.println("In SPO02 scope");
   if (TASK_COMPLETE_3 == true) {
+    Serial.println("Task 3 is already completed");
+    xSemaphoreGive(xMutex); // release mutex
+    vTaskDelete(NULL);
     exit;
   }
-    vTaskDelete(NULL);
-  
-  (void) pvParameters;
-
-  xSemaphoreTake(xMutex, portMAX_DELAY);
 
   checkFlag=false;
   //digitalWrite(GREEN_LED, 1);
@@ -1916,7 +1926,7 @@ void spo2Max30102(void *pvParameters)
     displayError();
   }
   TASK_COMPLETE_3 = true;
-
+  xSemaphoreGive(xMutex); // release mutex
   vTaskDelay(pdMS_TO_TICKS(100));
   vTaskDelete(NULL);
 }
@@ -1952,7 +1962,7 @@ void tempMlx90614(void *pvParameters)
   Serial.println(TASK_COMPLETE_2);
   Serial.println(TASK_COMPLETE_3);
   Serial.println(TASK_COMPLETE_4);
-
+  xSemaphoreGive(xMutex); // release mutex
   deleteOldInstances();
   vTaskDelete(NULL);
 
