@@ -40,6 +40,16 @@
 #include <WiFiMulti.h>
 WiFiMulti wifiMulti;
 
+#include <ctime>
+#include <NTPClient.h>
+
+const char *ntpServer = "162.159.200.123";
+const long utcOffsetInSeconds = 8 * 3600;
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, ntpServer,utcOffsetInSeconds);
+
+
+
 // LittleFS has higher priority than SPIFFS
 #if ( ARDUINO_ESP32C3_DEV )
   // Currently, ESP32-C3 only supporting SPIFFS and EEPROM. Will fix to support LittleFS
@@ -114,16 +124,16 @@ bool initialConfig = false; //default false
 
 // Json format size
 const size_t SENSORDATA_JSON_SIZE0 = JSON_OBJECT_SIZE(6)+150;
-const size_t SENSORDATA_JSON_SIZE1 = JSON_OBJECT_SIZE(6);
+const size_t SENSORDATA_JSON_SIZE1 = JSON_OBJECT_SIZE(10);
 uint8_t user_id = 1;
 
 // Default configuration values for MQTT
 // This actually works
 #define MQTT_SERVER              "192.168.1.7"
 #define MQTT_SERVERPORT          "1883" //1883, or 8883 for SSL
-#define MQTT_USERNAME            "default"
-#define MQTT_KEY                 "default" //key or password
-#define MQTT_TOPIC               "hass/sensor/hcd/ESP32_xxxxx/state" // MQTT TOPIC
+#define MQTT_USERNAME            "guest"
+#define MQTT_KEY                 "guest" //key or password
+#define MQTT_TOPIC               "esp32/smartband" // MQTT TOPIC
 
 // Labels for custom parameters in WiFi manager
 #define MQTT_SERVER_Label             "MQTT_SERVER_Label"
@@ -145,7 +155,7 @@ char custom_MQTT_SERVERPORT[custom_MQTT_PORT_LEN];
 char custom_MQTT_USERNAME[custom_MQTT_USERNAME_LEN];
 char custom_MQTT_KEY[custom_MQTT_KEY_LEN];
 char custom_MQTT_TOPIC[custom_MQTT_TOPIC_LEN];
-char sensor_payload[50] = "payload";
+char sensor_payload[255] = "payload";
 
 // Function Prototypes
 void MQTT_connect();
@@ -384,6 +394,8 @@ int str_len;
 char char_array1[10];
 char char_array2[10];
 
+char datetime[100];
+
 SemaphoreHandle_t  xMutex;
 
 //**************************************************************************
@@ -487,6 +499,7 @@ uint8_t connectMultiWiFi()
 
   if ( status == WL_CONNECTED )
   {
+    Serial.println(F("\nWiFi Connected"));
     LOGERROR1(F("WiFi connected after time: "), i);
     LOGERROR3(F("SSID:"), WiFi.SSID(), F(",RSSI="), WiFi.RSSI());
     LOGERROR3(F("Channel:"), WiFi.channel(), F(",IP address:"), WiFi.localIP() );
@@ -524,6 +537,12 @@ void check_WiFi()
     Serial.println(F("\nWiFi lost. Call connectMultiWiFi in loop"));
     connectMultiWiFi();
   }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    timeClient.begin();
+    timeClient.update();
+    Serial.println(F("\nTime Sync"));
+  }
 }
 
 //**************************************************************************
@@ -533,12 +552,27 @@ void data_publish()
   check_WiFi(); // check wifi status and reconnect
 
   StaticJsonDocument<SENSORDATA_JSON_SIZE1> json1;
-  JsonObject userID = json1.createNestedObject("id" + String(user_id));
+// Get the epoch time (seconds since 1970-01-01 00:00:00 UTC)
+  unsigned long epochTime = timeClient.getEpochTime();
+
+  // Convert epoch time to local time struct (not directly supported on ESP32 with Arduino)
+  // Example below shows manual conversion, adjust according to your requirements
+  time_t rawtime = epochTime;
+  struct tm * timeinfo;
+  timeinfo = gmtime(&rawtime);
+
+  // Print formatted time
+  char formattedTime[20]; // Buffer to hold the formatted time string
+  sprintf(formattedTime, "%04d-%02d-%02d %02d:%02d:%02d",
+          timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
+          timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+  JsonObject userID = json1.createNestedObject(formattedTime);
+  userID["dev_id"] = ssid; //Heart Rate
   userID["hr"] = beatAvg; //Heart Rate Average
   userID["spo2"] = spo2; // SpO2
   userID["temp"] = objectTemp; // Body Temperature
   serializeJson(json1, Serial);
-  serializeJson(json1, sensor_payload, sizeof(sensor_payload));
+  serializeJson(json1, sensor_payload);
   //pub_sensor_values.publish(sensor_payload);
 
   Serial.print(F(pub_sensor_values));  
@@ -694,21 +728,39 @@ void createNewInstances()
   // Create new instances from new data
   if (!mqtt)
   {
-    // Setup the MQTT client class by passing in the WiFi client and MQTT server and login details.
-    mqtt = new Adafruit_MQTT_Client(client, custom_MQTT_SERVER, atoi(custom_MQTT_SERVERPORT), custom_MQTT_USERNAME, custom_MQTT_KEY);
-    
-    Serial.print(F("Creating new MQTT object : "));
-    
-    if (mqtt)
-    {
-      Serial.println(F("OK"));
-      Serial.println(String("MQTT_SERVER = ")    + custom_MQTT_SERVER    + ", MQTT_SERVERPORT = "  + custom_MQTT_SERVERPORT);
-      Serial.println(String("MQTT_USERNAME = ")  + custom_MQTT_USERNAME  + ", MQTT_KEY = "         + custom_MQTT_KEY);
-      Serial.println(String("MQTT_Pub_Topic = ")  + MQTT_Pub_Topic);
+    // // Setup the MQTT client class by passing in the WiFi client and MQTT server and login details.
+    // Serial.print(F("Creating new MQTT object : "));
+
+    // if (custom_MQTT_SERVER != ""){
+    //   mqtt = new Adafruit_MQTT_Client(client, custom_MQTT_SERVER, atoi(custom_MQTT_SERVERPORT), custom_MQTT_USERNAME, custom_MQTT_KEY);
+
+    //   if (mqtt)
+    //   {
+    //     Serial.println(F("OK"));
+    //     Serial.println(String("MQTT_SERVER = ")    + custom_MQTT_SERVER    + ", MQTT_SERVERPORT = "  + custom_MQTT_SERVERPORT);
+    //     Serial.println(String("MQTT_USERNAME = ")  + custom_MQTT_USERNAME  + ", MQTT_KEY = "         + custom_MQTT_KEY);
+    //     Serial.println(String("MQTT_Pub_Topic = ")  + MQTT_Pub_Topic);
+    //   }
+    //   else
+    //     Serial.println(F("Failed"));
+
+    // }
+    // else{
+      mqtt = new Adafruit_MQTT_Client(client, MQTT_SERVER, atoi(MQTT_SERVERPORT), MQTT_USERNAME, MQTT_KEY);
+      if (mqtt)
+      {
+        Serial.println(F("OK"));
+        Serial.println(String("MQTT_SERVER = ")    + MQTT_SERVER    + ", MQTT_SERVERPORT = "  + MQTT_SERVERPORT);
+        Serial.println(String("MQTT_USERNAME = ")  + MQTT_USERNAME  + ", MQTT_KEY = "         + MQTT_KEY);
+        Serial.println(String("MQTT_Pub_Topic = ")  + MQTT_Pub_Topic);
+      }
+      else{
+        Serial.println(F("Failed"));
+      }
     }
-    else
-      Serial.println(F("Failed"));
-  }
+  
+  
+    
   
   if (!pub_sensor_values)
   {
@@ -1075,7 +1127,7 @@ void MQTT_connect()
 {
   int8_t ret;
 
-  MQTT_Pub_Topic = String(custom_MQTT_TOPIC);
+  MQTT_Pub_Topic = String(MQTT_TOPIC);
 
   createNewInstances();
 
@@ -1269,6 +1321,8 @@ void setup()
    
     connectMultiWiFi();
   } */
+ check_WiFi();
+
 
   //digitalWrite(BLUE_LED, LED_OFF); // Turn led off as we are not in configuration mode.
   pixels->clear();
