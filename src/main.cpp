@@ -48,7 +48,11 @@ const long utcOffsetInSeconds = 8 * 3600;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, ntpServer,utcOffsetInSeconds);
 
-
+//Task completion flags
+bool TASK_COMPLETE_1 = true;
+bool TASK_COMPLETE_2 = true;
+bool TASK_COMPLETE_3 = true;
+bool TASK_COMPLETE_4 = true;
 
 // LittleFS has higher priority than SPIFFS
 #if ( ARDUINO_ESP32C3_DEV )
@@ -397,6 +401,12 @@ char char_array2[10];
 char datetime[100];
 
 SemaphoreHandle_t  xMutex;
+
+TaskHandle_t TaskHandle_0;
+TaskHandle_t TaskHandle_1; // handler for Task1
+TaskHandle_t TaskHandle_2; // handler for Task2
+TaskHandle_t TaskHandle_3; // handler for Task3
+
 
 //**************************************************************************
 //**************************************************************************
@@ -1160,12 +1170,6 @@ void MQTT_connect()
   Serial.println(F("WiFi MQTT connection successful!"));
 }
 
-// ************************************************************************************************************
-// Define reference handlers to these two tasks. Use these TaskHandle_t type variables to change task priority.
-TaskHandle_t TaskHandle_0;
-TaskHandle_t TaskHandle_1; // handler for Task1
-TaskHandle_t TaskHandle_2; // handler for Task2
-TaskHandle_t TaskHandle_3; // handler for Task3
 
 //event handler functions for button
 //**************************************************************************
@@ -1196,15 +1200,15 @@ static void handleDoubleClick()
 }
 
 //**************************************************************************
-//**************************************************************************
-static void handleLongPressStop() 
-{
-  Serial.println(F("Button pressed for long time and then released!"));
-  vTaskDelay(10);
-  vTaskSuspend(TaskHandle_0);
-  wifi_manager();
-  vTaskResume(TaskHandle_0);
-}
+// //**************************************************************************
+// static void handleLongPressStop() 
+// {
+//   Serial.println(F("Button pressed for long time and then released!"));
+//   vTaskDelay(10);
+//   vTaskSuspend(TaskHandle_0);
+//   wifi_manager();
+//   vTaskResume(TaskHandle_0);
+// }
 
 // *********************************** Setup function ********************************************************************************
 // ***********************************************************************************************************************************
@@ -1232,7 +1236,7 @@ void setup()
   Serial.print(F(" on ")); Serial.println(ARDUINO_BOARD);
   Serial.println(ESP_WIFIMANAGER_VERSION);
 
-  btn.attachClick(handleLongPressStop);
+  // btn.attachClick(handleLongPressStop);
   // btn.attachDoubleClick(handleDoubleClick);
   // btn.attachLongPressStop(handleLongPressStop);
 
@@ -1351,48 +1355,53 @@ void setup()
   display.clearDisplay();
   display.setTextColor(WHITE);
   display.setRotation(2);
+    // MAX30102
+    particleSensor.setup(ledBrightness, sampleAverage, ledMode, sampleRate, pulseWidth, adcRange); //Configure sensor with these settings
+    // MLX90614
+    mlx.begin();
 
-  // MAX30102
-  particleSensor.setup(ledBrightness, sampleAverage, ledMode, sampleRate, pulseWidth, adcRange); //Configure sensor with these settings
-  // MLX90614
-  mlx.begin();
 
-  // set up 4 tasks to run independently.
-  xTaskCreatePinnedToCore(
-    preCheck
-    ,  "preCheck"   // A name just for humans
-    ,  4000  // This stack size can be checked & adjusted by reading the Stack Highwater
-    ,  NULL
-    ,  3 // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
-    ,  &TaskHandle_0
-    ,  0);
+  // // MAX30102
+  // particleSensor.setup(ledBrightness, sampleAverage, ledMode, sampleRate, pulseWidth, adcRange); //Configure sensor with these settings
+  // // MLX90614
+  // mlx.begin();
+
+  // // set up 4 tasks to run independently.
+  // xTaskCreatePinnedToCore(
+  //   preCheck
+  //   ,  "preCheck"   // A name just for humans
+  //   ,  4000  // This stack size can be checked & adjusted by reading the Stack Highwater
+  //   ,  NULL
+  //   ,  3 // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+  //   ,  &TaskHandle_0
+  //   ,  0);
     
-  xTaskCreatePinnedToCore(
-    hrMax30102
-    ,  "hrMax30102"   // A name just for humans
-    ,  3000  // This stack size can be checked & adjusted by reading the Stack Highwater
-    ,  NULL
-    ,  2 // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
-    ,  &TaskHandle_1
-    ,  0); 
+  // xTaskCreatePinnedToCore(
+  //   hrMax30102
+  //   ,  "hrMax30102"   // A name just for humans
+  //   ,  3000  // This stack size can be checked & adjusted by reading the Stack Highwater
+  //   ,  NULL
+  //   ,  2 // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+  //   ,  &TaskHandle_1
+  //   ,  0); 
   
-  xTaskCreatePinnedToCore(
-    spo2Max30102
-    ,  "spo2Max30102"   // A name just for humans
-    ,  4000  // This stack size can be checked & adjusted by reading the Stack Highwater
-    ,  NULL
-    ,  1  // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
-    ,  &TaskHandle_2
-    ,  0); 
+  // xTaskCreatePinnedToCore(
+  //   spo2Max30102
+  //   ,  "spo2Max30102"   // A name just for humans
+  //   ,  4000  // This stack size can be checked & adjusted by reading the Stack Highwater
+  //   ,  NULL
+  //   ,  1  // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+  //   ,  &TaskHandle_2
+  //   ,  0); 
 
-  xTaskCreatePinnedToCore(
-    tempMlx90614
-    ,  "tempMlx90614"   // A name just for humans
-    ,  4000  // This stack size can be checked & adjusted by reading the Stack Highwater
-    ,  NULL
-    ,  0  // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
-    ,  &TaskHandle_3
-    ,  0);
+  // xTaskCreatePinnedToCore(
+  //   tempMlx90614
+  //   ,  "tempMlx90614"   // A name just for humans
+  //   ,  4000  // This stack size can be checked & adjusted by reading the Stack Highwater
+  //   ,  NULL
+  //   ,  0  // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+  //   ,  &TaskHandle_3
+  //   ,  0);
 
 }
 
@@ -1400,10 +1409,92 @@ void setup()
 // ******************************************************************************************************************************
 void loop()
 { 
-  btn.tick(); //loop function runs on cpu core 1 by default 
-  if ( checkFlag == false ){
-    // loop() is also the one of FreeRTOS Tasks, so delete own after running task1.
-    vTaskDelete(NULL); 
+  // btn.tick(); //loop function runs on cpu core 1 by default 
+  // if ( checkFlag == false ){
+  //   // loop() is also the one of FreeRTOS Tasks, so delete own after running task1.
+  //   vTaskDelete(NULL); 
+  // }
+  // delay(500);
+  if (TASK_COMPLETE_1 == true & TASK_COMPLETE_2 == true & TASK_COMPLETE_3 == true & TASK_COMPLETE_4 == true) {
+    // create mutex and assign it a already create handler 
+    xMutex = xSemaphoreCreateMutex();
+  
+
+    // ************************************************************************************************************
+    // Define reference handlers to these two tasks. Use these TaskHandle_t type variables to change task priority.
+    
+    if (TaskHandle_0 != NULL) {
+      vTaskDelete(TaskHandle_0);
+    }
+    if (TaskHandle_1 != NULL) {
+      vTaskDelete(TaskHandle_1);
+    }
+    if (TaskHandle_2 != NULL) {
+      vTaskDelete(TaskHandle_2);
+    }
+    if (TaskHandle_3 != NULL) {
+      vTaskDelete(TaskHandle_3);
+    }
+    TaskHandle_0 = NULL;
+    TaskHandle_1 = NULL;
+    TaskHandle_2 = NULL;
+    TaskHandle_3 = NULL;
+
+    delay(500);
+    Serial.println(F("New Task"));
+
+    TaskHandle_t TaskHandle_0;
+    TaskHandle_t TaskHandle_1; // handler for Task1
+    TaskHandle_t TaskHandle_2; // handler for Task2
+    TaskHandle_t TaskHandle_3; // handler for Task3
+
+    delay(500);
+    TASK_COMPLETE_1 = false;
+    TASK_COMPLETE_2 = false;
+    TASK_COMPLETE_3 = false;
+    TASK_COMPLETE_4 = false;
+    Serial.println(F("Starting New Loop"));
+    check_WiFi();    
+
+    // set up 4 tasks to run independently.
+    xTaskCreatePinnedToCore(
+      preCheck
+      ,  "preCheck"   // A name just for humans
+      ,  4000  // This stack size can be checked & adjusted by reading the Stack Highwater
+      ,  NULL
+      ,  3 // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+      ,  &TaskHandle_0
+      ,  0);
+      
+    xTaskCreatePinnedToCore(
+      hrMax30102
+      ,  "hrMax30102"   // A name just for humans
+      ,  3000  // This stack size can be checked & adjusted by reading the Stack Highwater
+      ,  NULL
+      ,  2 // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+      ,  &TaskHandle_1
+      ,  0); 
+    
+    xTaskCreatePinnedToCore(
+      spo2Max30102
+      ,  "spo2Max30102"   // A name just for humans
+      ,  4000  // This stack size can be checked & adjusted by reading the Stack Highwater
+      ,  NULL
+      ,  1  // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+      ,  &TaskHandle_2
+      ,  0); 
+
+    xTaskCreatePinnedToCore(
+      tempMlx90614
+      ,  "tempMlx90614"   // A name just for humans
+      ,  4000  // This stack size can be checked & adjusted by reading the Stack Highwater
+      ,  NULL
+      ,  0  // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+      ,  &TaskHandle_3
+      ,  0);
+
+    Serial.println(F("Recreated tasks to core"));
+    
   }
 }
 
@@ -1486,7 +1577,7 @@ void displayError() {
   //yield();
   display.display();
   delay(2000);
-  
+
   xSemaphoreGive(xMutex); // release mutex
   //tempMlx90614(NULL);
 }
@@ -1568,6 +1659,7 @@ void preCheck(void *pvParameters)
     {
       Serial.println(" Something is there!");
       particleSensor.setPulseAmplitudeRed(ledBrightness);
+      TASK_COMPLETE_1 = true;
 
       xSemaphoreGive(xMutex); // release mutex
       vTaskDelay(pdMS_TO_TICKS(100));
@@ -1575,6 +1667,8 @@ void preCheck(void *pvParameters)
     }
     //displayNotice();
   }
+  TASK_COMPLETE_1 = true;
+
 }
 
 // MAX30102:Mesuring Heart Beat
@@ -1641,6 +1735,7 @@ void hrMax30102(void *pvParameters)
       chkCount++;
       Serial.print(" No finger?");
       if (chkCount > 100) {
+        Serial.println(F("\nNo finger detected!"));
         break;
       }
     }  
@@ -1673,11 +1768,14 @@ void hrMax30102(void *pvParameters)
     displayFinal(p);
     
   }else {
-    vTaskSuspend(TaskHandle_2); //Suspend spo2Max30102 Task
+    TASK_COMPLETE_2 = true;
+    TASK_COMPLETE_3 = true;
+    // vTaskSuspend(TaskHandle_2); //Suspend spo2Max30102 Task
     beatAvg = 0;
     spo2 = 0;
     displayError();
   }
+  TASK_COMPLETE_2 = true;
   
   vTaskDelay(pdMS_TO_TICKS(100));
   vTaskDelete(NULL);
@@ -1687,6 +1785,11 @@ void hrMax30102(void *pvParameters)
 //*******************************************************************************************************
 void spo2Max30102(void *pvParameters)
 {
+  if (TASK_COMPLETE_3 == true) {
+    exit;
+  }
+    vTaskDelete(NULL);
+  
   (void) pvParameters;
 
   xSemaphoreTake(xMutex, portMAX_DELAY);
@@ -1804,14 +1907,16 @@ void spo2Max30102(void *pvParameters)
     
     p->base_unit1 = "%";
     p->base_unit2 = "bpm";
-    
+
     displayFinal(p);
     
   } else {
     spo2 = 0;
+    TASK_COMPLETE_3 = true;
     displayError();
   }
-  
+  TASK_COMPLETE_3 = true;
+
   vTaskDelay(pdMS_TO_TICKS(100));
   vTaskDelete(NULL);
 }
@@ -1840,9 +1945,18 @@ void tempMlx90614(void *pvParameters)
 
   data_publish();
   vTaskDelay(pdMS_TO_TICKS(200));
+  delay(500);
+  TASK_COMPLETE_4 = true;
+
+  Serial.println(TASK_COMPLETE_1);
+  Serial.println(TASK_COMPLETE_2);
+  Serial.println(TASK_COMPLETE_3);
+  Serial.println(TASK_COMPLETE_4);
 
   deleteOldInstances();
+  vTaskDelete(NULL);
+
   // WiFi.mode(WIFI_OFF);
 
-  ESP.restart();
+  // ESP.restart();
 }
